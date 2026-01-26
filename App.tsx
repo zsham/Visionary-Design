@@ -176,7 +176,7 @@ const App: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-1 group cursor-help">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] group-hover:text-indigo-600 transition-colors">Gemini Flash Core v2.5</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] group-hover:text-indigo-600 transition-colors">Visionary Design v1.0</span>
         </div>
       </footer>
 
