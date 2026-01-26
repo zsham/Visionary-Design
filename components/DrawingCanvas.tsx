@@ -14,86 +14,136 @@ export interface DrawingCanvasHandle {
 }
 
 const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ state, backgroundImage }, ref) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const drawCanvasRef = useRef<HTMLCanvasElement>(null);
+  const bgCanvasRef = useRef<HTMLCanvasElement>(null);
+  
   const [isDrawing, setIsDrawing] = useState(false);
   const [history, setHistory] = useState<ImageData[]>([]);
 
   useImperativeHandle(ref, () => ({
     clear: () => {
-      const ctx = canvasRef.current?.getContext('2d');
-      if (ctx && canvasRef.current) {
-        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        if (backgroundImage) {
-          drawBackgroundImage(ctx, backgroundImage);
-        }
+      const drawCtx = drawCanvasRef.current?.getContext('2d');
+      if (drawCtx && drawCanvasRef.current) {
+        drawCtx.clearRect(0, 0, drawCanvasRef.current.width, drawCanvasRef.current.height);
         saveToHistory();
       }
     },
     getImageData: () => {
-      return canvasRef.current?.toDataURL('image/png') || '';
+      const drawCanvas = drawCanvasRef.current;
+      const bgCanvas = bgCanvasRef.current;
+      if (!drawCanvas || !bgCanvas) return '';
+
+      // Create a temporary canvas to merge both layers for export
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = drawCanvas.width;
+      tempCanvas.height = drawCanvas.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx) {
+        tempCtx.drawImage(bgCanvas, 0, 0);
+        tempCtx.drawImage(drawCanvas, 0, 0);
+      }
+      return tempCanvas.toDataURL('image/png');
     },
     undo: () => {
       if (history.length > 1) {
         const newHistory = history.slice(0, -1);
         const lastState = newHistory[newHistory.length - 1];
-        const ctx = canvasRef.current?.getContext('2d');
+        const ctx = drawCanvasRef.current?.getContext('2d');
         if (ctx && lastState) {
           ctx.putImageData(lastState, 0, 0);
           setHistory(newHistory);
+        }
+      } else if (history.length === 1) {
+        const ctx = drawCanvasRef.current?.getContext('2d');
+        if (ctx && drawCanvasRef.current) {
+          ctx.clearRect(0, 0, drawCanvasRef.current.width, drawCanvasRef.current.height);
+          setHistory([]);
         }
       }
     }
   }));
 
   const saveToHistory = () => {
-    const ctx = canvasRef.current?.getContext('2d');
-    if (ctx && canvasRef.current) {
-      const currentData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-      setHistory(prev => [...prev.slice(-19), currentData]); // Keep last 20 states
+    const ctx = drawCanvasRef.current?.getContext('2d');
+    if (ctx && drawCanvasRef.current) {
+      const currentData = ctx.getImageData(0, 0, drawCanvasRef.current.width, drawCanvasRef.current.height);
+      setHistory(prev => [...prev.slice(-19), currentData]);
     }
   };
 
-  const drawBackgroundImage = (ctx: CanvasRenderingContext2D, url: string) => {
+  const drawBackgroundImage = (url: string) => {
+    const bgCanvas = bgCanvasRef.current;
+    const ctx = bgCanvas?.getContext('2d');
+    if (!bgCanvas || !ctx) return;
+
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const hRatio = canvas.width / img.width;
-      const vRatio = canvas.height / img.height;
+      ctx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+      const hRatio = bgCanvas.width / img.width;
+      const vRatio = bgCanvas.height / img.height;
       const ratio = Math.max(hRatio, vRatio);
-      const centerShift_x = (canvas.width - img.width * ratio) / 2;
-      const centerShift_y = (canvas.height - img.height * ratio) / 2;
+      const centerShift_x = (bgCanvas.width - img.width * ratio) / 2;
+      const centerShift_y = (bgCanvas.height - img.height * ratio) / 2;
       ctx.drawImage(img, 0, 0, img.width, img.height,
         centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
-      saveToHistory();
     };
     img.src = url;
   };
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      canvas.width = canvas.parentElement?.clientWidth || 800;
-      canvas.height = canvas.parentElement?.clientHeight || 600;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        saveToHistory();
+    const resize = () => {
+      const container = containerRef.current;
+      const drawCanvas = drawCanvasRef.current;
+      const bgCanvas = bgCanvasRef.current;
+      if (container && drawCanvas && bgCanvas) {
+        const { clientWidth, clientHeight } = container;
+        
+        // Preserve drawing on resize if possible
+        const tempDraw = drawCanvas.getContext('2d')?.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+        
+        drawCanvas.width = clientWidth;
+        drawCanvas.height = clientHeight;
+        bgCanvas.width = clientWidth;
+        bgCanvas.height = clientHeight;
+
+        const drawCtx = drawCanvas.getContext('2d');
+        if (drawCtx) {
+          drawCtx.lineCap = 'round';
+          drawCtx.lineJoin = 'round';
+          if (tempDraw) drawCtx.putImageData(tempDraw, 0, 0);
+        }
+        
+        if (backgroundImage) {
+          drawBackgroundImage(backgroundImage);
+        } else {
+          const ctx = bgCanvas.getContext('2d');
+          if (ctx) ctx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+        }
       }
-    }
-  }, []);
+    };
+
+    resize();
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, []); // Initial mount and resize events
 
   useEffect(() => {
-    const ctx = canvasRef.current?.getContext('2d');
-    if (ctx && backgroundImage) {
-      drawBackgroundImage(ctx, backgroundImage);
+    if (backgroundImage) {
+      drawBackgroundImage(backgroundImage);
+    } else {
+      const bgCanvas = bgCanvasRef.current;
+      const ctx = bgCanvas?.getContext('2d');
+      if (bgCanvas && ctx) {
+        ctx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+      }
     }
   }, [backgroundImage]);
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     setIsDrawing(true);
-    const canvas = canvasRef.current;
+    const canvas = drawCanvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (ctx && canvas) {
       const rect = canvas.getBoundingClientRect();
@@ -102,14 +152,22 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       
       ctx.beginPath();
       ctx.moveTo(x, y);
-      ctx.strokeStyle = state.tool === 'eraser' ? '#ffffff' : state.color;
+      
+      if (state.tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = state.color;
+      }
+      
       ctx.lineWidth = state.brushSize;
     }
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing) return;
-    const canvas = canvasRef.current;
+    const canvas = drawCanvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (ctx && canvas) {
       const rect = canvas.getBoundingClientRect();
@@ -128,9 +186,15 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
   };
 
   return (
-    <div className="w-full h-full bg-white rounded-xl shadow-inner relative overflow-hidden">
+    <div ref={containerRef} className="w-full h-full bg-white rounded-xl shadow-inner relative overflow-hidden">
+      {/* Background Layer */}
       <canvas
-        ref={canvasRef}
+        ref={bgCanvasRef}
+        className="absolute inset-0 pointer-events-none"
+      />
+      {/* Drawing Layer */}
+      <canvas
+        ref={drawCanvasRef}
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
@@ -138,7 +202,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
         onTouchStart={startDrawing}
         onTouchMove={draw}
         onTouchEnd={stopDrawing}
-        className="cursor-crosshair w-full h-full"
+        className="absolute inset-0 cursor-crosshair"
       />
     </div>
   );

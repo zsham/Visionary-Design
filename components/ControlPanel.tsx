@@ -8,100 +8,132 @@ interface ControlPanelProps {
   onClear: () => void;
   onUndo: () => void;
   onDownload: () => void;
+  onReset: () => void;
 }
 
-const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, onUndo, onDownload }) => {
-  const colors = [
-    '#000000', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b'
-  ];
+const PencilIcon = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+);
 
-  const tools: { id: Tool; label: string; icon: string }[] = [
-    { id: 'pencil', label: 'Pencil', icon: '✎' },
-    { id: 'eraser', label: 'Eraser', icon: '⌫' },
+const EraserIcon = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M20 20H7L3 16C2 15 2 13 3 12L13 2L22 11L20 20Z"></path><path d="M17 17L7 7"></path></svg>
+);
+
+const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, onUndo, onDownload, onReset }) => {
+  const colors = [
+    '#0f172a', '#e11d48', '#f59e0b', '#10b981', '#2563eb', '#7c3aed', '#db2777', '#64748b'
   ];
 
   return (
-    <div className="w-20 md:w-64 bg-white border-r border-slate-200 p-4 flex flex-col gap-8 h-full overflow-y-auto">
-      <div className="hidden md:block">
-        <h2 className="text-xl font-bold text-slate-800">Studio Tools</h2>
-        <p className="text-xs text-slate-500 mt-1">Refine your project</p>
-      </div>
-
-      {/* Tools Section */}
-      <div>
-        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 block">Main Tools</label>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {tools.map((t) => (
+    <div className="w-16 md:w-64 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden">
+      {/* Tool Groups */}
+      <div className="flex-1 overflow-y-auto px-3 py-6 space-y-8">
+        {/* Tool Selector */}
+        <section>
+          <label className="hidden md:block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 px-1">Selection</label>
+          <div className="flex flex-col md:grid md:grid-cols-2 gap-2">
             <button
-              key={t.id}
-              onClick={() => setState(prev => ({ ...prev, tool: t.id }))}
-              className={`p-3 rounded-lg flex flex-col items-center justify-center transition-all ${
-                state.tool === t.id 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' 
-                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+              onClick={() => setState(prev => ({ ...prev, tool: 'pencil' }))}
+              className={`p-3 rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${
+                state.tool === 'pencil' 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
               }`}
+              title="Pencil Tool (P)"
             >
-              <span className="text-xl">{t.icon}</span>
-              <span className="text-[10px] mt-1 font-medium hidden md:block">{t.label}</span>
+              <PencilIcon />
+              <span className="text-[10px] mt-2 font-semibold hidden md:block">Draw</span>
             </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Brush Size */}
-      <div>
-        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 block">Size</label>
-        <input
-          type="range"
-          min="1"
-          max="50"
-          value={state.brushSize}
-          onChange={(e) => setState(prev => ({ ...prev, brushSize: parseInt(e.target.value) }))}
-          className="w-full accent-blue-600"
-        />
-        <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-          <span>1px</span>
-          <span>{state.brushSize}px</span>
-          <span>50px</span>
-        </div>
-      </div>
-
-      {/* Colors */}
-      <div>
-        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 block">Palette</label>
-        <div className="grid grid-cols-4 gap-2">
-          {colors.map((c) => (
             <button
-              key={c}
-              onClick={() => setState(prev => ({ ...prev, color: c, tool: 'pencil' }))}
-              className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
-                state.color === c && state.tool === 'pencil' ? 'border-blue-400 scale-110 ring-2 ring-blue-100' : 'border-transparent'
+              onClick={() => setState(prev => ({ ...prev, tool: 'eraser' }))}
+              className={`p-3 rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${
+                state.tool === 'eraser' 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
               }`}
-              style={{ backgroundColor: c }}
+              title="Eraser Tool (E)"
+            >
+              <EraserIcon />
+              <span className="text-[10px] mt-2 font-semibold hidden md:block">Erase</span>
+            </button>
+          </div>
+        </section>
+
+        {/* Color Palette */}
+        <section>
+          <label className="hidden md:block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 px-1">Palette</label>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
+            {colors.map((c) => (
+              <button
+                key={c}
+                onClick={() => setState(prev => ({ ...prev, color: c, tool: 'pencil' }))}
+                className={`w-8 h-8 md:w-full aspect-square rounded-full md:rounded-lg transition-all duration-200 hover:scale-110 border-2 ${
+                  state.color === c && state.tool === 'pencil' 
+                  ? 'border-indigo-500 ring-4 ring-indigo-50' 
+                  : 'border-white md:border-transparent'
+                }`}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+            <div className="hidden md:flex w-full aspect-square rounded-lg bg-slate-50 border border-slate-200 items-center justify-center text-slate-400 cursor-help" title="More colors coming soon">
+              <span className="text-xs">+</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Stroke Settings */}
+        <section className="hidden md:block">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 px-1">Stroke Weight</label>
+          <div className="px-1 pt-2">
+            <input
+              type="range"
+              min="1"
+              max="60"
+              value={state.brushSize}
+              onChange={(e) => setState(prev => ({ ...prev, brushSize: parseInt(e.target.value) }))}
+              className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
             />
-          ))}
-        </div>
+            <div className="flex justify-between text-[10px] text-slate-400 mt-3 font-medium">
+              <span>Thin</span>
+              <span className="text-slate-900 bg-slate-100 px-1.5 rounded">{state.brushSize}px</span>
+              <span>Bold</span>
+            </div>
+          </div>
+        </section>
       </div>
 
-      {/* Actions */}
-      <div className="mt-auto space-y-2">
+      {/* Action Footer */}
+      <div className="p-3 bg-slate-50/50 border-t border-slate-200 space-y-2">
+        <div className="flex gap-2">
+          <button 
+            onClick={onUndo}
+            className="flex-1 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+            title="Undo (Ctrl+Z)"
+          >
+            <span className="text-xs font-bold">Undo</span>
+          </button>
+          <button 
+            onClick={onClear}
+            className="flex-1 py-2.5 rounded-lg bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all active:scale-95 shadow-sm"
+            title="Clear Drawing"
+          >
+            <span className="text-xs font-bold">Clear</span>
+          </button>
+        </div>
+        
         <button 
-          onClick={onUndo}
-          className="w-full py-2 px-4 rounded-lg bg-slate-100 text-slate-700 font-medium text-sm hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
+          onClick={onReset}
+          className="w-full py-2.5 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-md active:scale-95"
         >
-          <span>↩</span> <span className="hidden md:inline">Undo</span>
+          Reset Studio
         </button>
-        <button 
-          onClick={onClear}
-          className="w-full py-2 px-4 rounded-lg bg-red-50 text-red-600 font-medium text-sm hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-        >
-          <span>🗑</span> <span className="hidden md:inline">Clear All</span>
-        </button>
+
         <button 
           onClick={onDownload}
-          className="w-full py-2 px-4 rounded-lg bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+          className="w-full py-3 rounded-lg bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 active:scale-95"
         >
-          <span>⬇</span> <span className="hidden md:inline">Download</span>
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span className="hidden md:inline">Export Design</span>
         </button>
       </div>
     </div>

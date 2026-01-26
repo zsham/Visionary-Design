@@ -3,7 +3,8 @@ import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { AIResponse } from "../types";
 
 export const analyzeSketch = async (imageDataBase64: string): Promise<AIResponse> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  // Fix: Initialize GoogleGenAI strictly as per guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const prompt = `Analyze this design sketch. Provide a detailed summary of what you see and 3 actionable creative suggestions to improve or expand this design. 
   Focus on layout, balance, and creative direction.`;
@@ -43,7 +44,8 @@ export const analyzeSketch = async (imageDataBase64: string): Promise<AIResponse
 };
 
 export const generateBackgroundImage = async (prompt: string): Promise<string | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  // Fix: Initialize GoogleGenAI strictly as per guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
