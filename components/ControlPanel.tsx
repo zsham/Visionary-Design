@@ -1,6 +1,6 @@
 
 import React, { useRef } from 'react';
-import { Tool, CanvasState } from '../types';
+import { Tool, CanvasState, AspectRatio } from '../types';
 
 interface ControlPanelProps {
   state: CanvasState;
@@ -23,11 +23,23 @@ const TextIcon = () => (
   <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
 );
 
+const FrameIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+);
+
 const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, onUndo, onDownload, onReset }) => {
   const colorInputRef = useRef<HTMLInputElement>(null);
   
   const presets = [
     '#0f172a', '#e11d48', '#f59e0b', '#10b981', '#2563eb', '#7c3aed', '#db2777', '#64748b'
+  ];
+
+  const aspectRatios: { label: string; value: AspectRatio }[] = [
+    { label: '1:1', value: '1:1' },
+    { label: '16:9', value: '16:9' },
+    { label: '4:3', value: '4:3' },
+    { label: '9:16', value: '9:16' },
+    { label: '3:2', value: '3:2' },
   ];
 
   const isCustomColor = !presets.includes(state.color.toLowerCase());
@@ -84,6 +96,29 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
               <TextIcon />
               <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter">Type</span>
             </button>
+          </div>
+        </section>
+
+        {/* Canvas Frame Configuration */}
+        <section className="hidden md:block">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 px-1 flex items-center gap-2">
+            <FrameIcon />
+            Frame Layout
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {aspectRatios.map((ar) => (
+              <button
+                key={ar.value}
+                onClick={() => setState(prev => ({ ...prev, aspectRatio: ar.value }))}
+                className={`py-2 rounded-lg border text-[10px] font-bold transition-all ${
+                  state.aspectRatio === ar.value 
+                  ? 'bg-slate-900 border-slate-900 text-white shadow-md' 
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {ar.label}
+              </button>
+            ))}
           </div>
         </section>
 

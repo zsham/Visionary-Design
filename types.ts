@@ -1,5 +1,6 @@
 
 export type Tool = 'pencil' | 'eraser' | 'circle' | 'rectangle' | 'text';
+export type AspectRatio = '1:1' | '16:9' | '4:3' | '9:16' | '3:2';
 
 export interface CanvasState {
   color: string;
@@ -8,6 +9,7 @@ export interface CanvasState {
   fontSize: number;
   fontFamily: 'Inter' | 'Georgia' | 'monospace';
   isBold: boolean;
+  aspectRatio: AspectRatio;
 }
 
 export interface AIResponse {

@@ -103,7 +103,13 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       const bgCanvas = bgCanvasRef.current;
       if (container && drawCanvas && bgCanvas) {
         const { clientWidth, clientHeight } = container;
-        const tempDraw = drawCanvas.getContext('2d')?.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+        
+        // Save current drawing content before resize
+        const tempCtx = drawCanvas.getContext('2d');
+        let tempDrawData: ImageData | null = null;
+        if (tempCtx && drawCanvas.width > 0 && drawCanvas.height > 0) {
+          tempDrawData = tempCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+        }
         
         drawCanvas.width = clientWidth;
         drawCanvas.height = clientHeight;
@@ -114,7 +120,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
         if (drawCtx) {
           drawCtx.lineCap = 'round';
           drawCtx.lineJoin = 'round';
-          if (tempDraw) drawCtx.putImageData(tempDraw, 0, 0);
+          // Restore drawing if possible
+          if (tempDrawData) {
+            drawCtx.putImageData(tempDrawData, 0, 0);
+          }
         }
         
         if (backgroundImage) {
@@ -123,10 +132,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       }
     };
 
-    resize();
+    // Trigger resize on mount and when aspect ratio changes
+    const timer = setTimeout(resize, 50); // Small delay to allow DOM to settle
     window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
-  }, []);
+    return () => {
+      window.removeEventListener('resize', resize);
+      clearTimeout(timer);
+    };
+  }, [state.aspectRatio]); // CRITICAL: Listen for aspect ratio changes
 
   useEffect(() => {
     if (backgroundImage) {

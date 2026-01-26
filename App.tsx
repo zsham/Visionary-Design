@@ -4,7 +4,7 @@ import DrawingCanvas, { DrawingCanvasHandle } from './components/DrawingCanvas';
 import ControlPanel from './components/ControlPanel';
 import AIInsights from './components/AIInsights';
 import AuthModal from './components/AuthModal';
-import { CanvasState, User } from './types';
+import { CanvasState, User, AspectRatio } from './types';
 
 const App: React.FC = () => {
   const [canvasState, setCanvasState] = useState<CanvasState>({
@@ -13,7 +13,8 @@ const App: React.FC = () => {
     tool: 'pencil',
     fontSize: 24,
     fontFamily: 'Inter',
-    isBold: false
+    isBold: false,
+    aspectRatio: '16:9'
   });
   
   const [bgImage, setBgImage] = useState<string | null>(null);
@@ -57,6 +58,17 @@ const App: React.FC = () => {
 
   const handleBackgroundGenerated = (url: string) => {
     setBgImage(url);
+  };
+
+  const getAspectClass = (ar: AspectRatio) => {
+    switch (ar) {
+      case '1:1': return 'aspect-square';
+      case '16:9': return 'aspect-video';
+      case '4:3': return 'aspect-[4/3]';
+      case '9:16': return 'aspect-[9/16]';
+      case '3:2': return 'aspect-[3/2]';
+      default: return 'aspect-video';
+    }
   };
 
   return (
@@ -123,7 +135,8 @@ const App: React.FC = () => {
 
         {/* Studio Canvas */}
         <main className="flex-1 p-4 md:p-12 design-grid relative overflow-hidden flex items-center justify-center">
-          <div className="w-full h-full max-w-6xl aspect-[16/9] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] rounded-2xl overflow-hidden bg-white border border-slate-200 relative group transition-all duration-500">
+          {/* CRITICAL: Removed h-full and added max-h-full/max-w-full to allow aspect-ratio to work */}
+          <div className={`w-full max-w-full max-h-full ${getAspectClass(canvasState.aspectRatio)} shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] rounded-2xl overflow-hidden bg-white border border-slate-200 relative group transition-all duration-500`}>
             <DrawingCanvas 
               ref={canvasRef} 
               state={canvasState} 
@@ -133,7 +146,7 @@ const App: React.FC = () => {
             {/* Status Overlays */}
             <div className="absolute top-4 right-4 flex gap-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                <div className="px-3 py-1.5 bg-slate-900/90 text-white text-[10px] font-bold rounded-full backdrop-blur-md">
-                 {canvasState.tool === 'text' ? `${canvasState.fontSize}px` : `${canvasState.brushSize}px`} • {canvasState.tool.toUpperCase()}
+                 {canvasState.tool === 'text' ? `${canvasState.fontSize}px` : `${canvasState.brushSize}px`} • {canvasState.tool.toUpperCase()} • {canvasState.aspectRatio}
                </div>
             </div>
 
@@ -158,6 +171,8 @@ const App: React.FC = () => {
           </div>
           <div className="h-3 w-px bg-slate-200"></div>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Layer: 01 (Composition)</span>
+          <div className="h-3 w-px bg-slate-200"></div>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Frame: {canvasState.aspectRatio}</span>
         </div>
         
         <div className="flex items-center gap-1 group cursor-help">
