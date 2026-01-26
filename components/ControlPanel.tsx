@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Tool, CanvasState } from '../types';
 
 interface ControlPanelProps {
@@ -20,9 +20,21 @@ const EraserIcon = () => (
 );
 
 const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, onUndo, onDownload, onReset }) => {
-  const colors = [
+  const colorInputRef = useRef<HTMLInputElement>(null);
+  
+  const presets = [
     '#0f172a', '#e11d48', '#f59e0b', '#10b981', '#2563eb', '#7c3aed', '#db2777', '#64748b'
   ];
+
+  const isCustomColor = !presets.includes(state.color.toLowerCase());
+
+  const handleCustomColorClick = () => {
+    colorInputRef.current?.click();
+  };
+
+  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setState(prev => ({ ...prev, color: e.target.value, tool: 'pencil' }));
+  };
 
   return (
     <div className="w-16 md:w-64 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden">
@@ -63,20 +75,42 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
         <section>
           <label className="hidden md:block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 px-1">Palette</label>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
-            {colors.map((c) => (
+            {presets.map((c) => (
               <button
                 key={c}
                 onClick={() => setState(prev => ({ ...prev, color: c, tool: 'pencil' }))}
                 className={`w-8 h-8 md:w-full aspect-square rounded-full md:rounded-lg transition-all duration-200 hover:scale-110 border-2 ${
-                  state.color === c && state.tool === 'pencil' 
+                  state.color.toLowerCase() === c.toLowerCase() && state.tool === 'pencil' 
                   ? 'border-indigo-500 ring-4 ring-indigo-50' 
-                  : 'border-white md:border-transparent'
+                  : 'border-white md:border-transparent shadow-sm md:shadow-none'
                 }`}
                 style={{ backgroundColor: c }}
+                title={c}
               />
             ))}
-            <div className="hidden md:flex w-full aspect-square rounded-lg bg-slate-50 border border-slate-200 items-center justify-center text-slate-400 cursor-help" title="More colors coming soon">
-              <span className="text-xs">+</span>
+            
+            {/* Custom Color Picker Button */}
+            <div className="relative group">
+              <input 
+                ref={colorInputRef}
+                type="color" 
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer pointer-events-none"
+                onChange={handleColorChange}
+                value={state.color}
+              />
+              <button
+                onClick={handleCustomColorClick}
+                className={`w-8 h-8 md:w-full aspect-square rounded-full md:rounded-lg transition-all duration-200 hover:scale-105 border-2 flex items-center justify-center group-hover:shadow-md ${
+                  isCustomColor && state.tool === 'pencil'
+                  ? 'border-indigo-500 ring-4 ring-indigo-50 shadow-sm' 
+                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                }`}
+                style={isCustomColor ? { backgroundColor: state.color } : {}}
+                title="Custom Color"
+              >
+                {!isCustomColor && <span className="text-lg font-light leading-none">+</span>}
+                {isCustomColor && <span className="w-1 h-1 rounded-full bg-white shadow-sm opacity-50"></span>}
+              </button>
             </div>
           </div>
         </section>
