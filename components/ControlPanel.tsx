@@ -23,6 +23,10 @@ const TextIcon = () => (
   <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
 );
 
+const FillIcon = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M19 11l-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11z"></path><path d="m5 2 5 5"></path><path d="M2 13h15"></path><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4z"></path></svg>
+);
+
 const FrameIcon = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
 );
@@ -59,7 +63,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
         {/* Tool Selector */}
         <section>
           <label className="hidden md:block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 px-1">Studio Tools</label>
-          <div className="flex flex-col md:grid md:grid-cols-3 gap-2">
+          <div className="flex flex-col md:grid md:grid-cols-2 lg:grid-cols-3 gap-2">
             <button
               onClick={() => setState(prev => ({ ...prev, tool: 'pencil' }))}
               className={`p-3 rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${
@@ -70,7 +74,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
               title="Draw (P)"
             >
               <PencilIcon />
-              <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter">Draw</span>
+              <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter text-center">Draw</span>
             </button>
             <button
               onClick={() => setState(prev => ({ ...prev, tool: 'eraser' }))}
@@ -82,7 +86,19 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
               title="Erase (E)"
             >
               <EraserIcon />
-              <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter">Erase</span>
+              <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter text-center">Erase</span>
+            </button>
+            <button
+              onClick={() => setState(prev => ({ ...prev, tool: 'fill' }))}
+              className={`p-3 rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${
+                state.tool === 'fill' 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+              }`}
+              title="Fill (F)"
+            >
+              <FillIcon />
+              <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter text-center">Fill</span>
             </button>
             <button
               onClick={() => setState(prev => ({ ...prev, tool: 'text' }))}
@@ -94,7 +110,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
               title="Type (T)"
             >
               <TextIcon />
-              <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter">Type</span>
+              <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter text-center">Type</span>
             </button>
           </div>
         </section>
@@ -162,7 +178,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
               </div>
             </div>
           </section>
-        ) : (
+        ) : state.tool !== 'fill' ? (
           <section className="hidden md:block">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 px-1">Brush Weight</label>
             <div className="px-1 pt-2">
@@ -180,6 +196,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
                 <span>Bold</span>
               </div>
             </div>
+          </section>
+        ) : (
+          <section className="hidden md:block p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 animate-in fade-in slide-in-from-left-2">
+            <p className="text-[10px] text-indigo-700 font-bold uppercase tracking-widest leading-relaxed">
+              Flood Fill Active: Click any area to fill with the selected color.
+            </p>
           </section>
         )}
 

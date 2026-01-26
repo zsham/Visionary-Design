@@ -1,5 +1,5 @@
 
-export type Tool = 'pencil' | 'eraser' | 'circle' | 'rectangle' | 'text';
+export type Tool = 'pencil' | 'eraser' | 'circle' | 'rectangle' | 'text' | 'fill';
 export type AspectRatio = '1:1' | '16:9' | '4:3' | '9:16' | '3:2';
 
 export interface CanvasState {

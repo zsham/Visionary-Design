@@ -104,7 +104,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       if (container && drawCanvas && bgCanvas) {
         const { clientWidth, clientHeight } = container;
         
-        // Save current drawing content before resize
         const tempCtx = drawCanvas.getContext('2d');
         let tempDrawData: ImageData | null = null;
         if (tempCtx && drawCanvas.width > 0 && drawCanvas.height > 0) {
@@ -120,7 +119,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
         if (drawCtx) {
           drawCtx.lineCap = 'round';
           drawCtx.lineJoin = 'round';
-          // Restore drawing if possible
           if (tempDrawData) {
             drawCtx.putImageData(tempDrawData, 0, 0);
           }
@@ -132,14 +130,13 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       }
     };
 
-    // Trigger resize on mount and when aspect ratio changes
-    const timer = setTimeout(resize, 50); // Small delay to allow DOM to settle
+    const timer = setTimeout(resize, 50);
     window.addEventListener('resize', resize);
     return () => {
       window.removeEventListener('resize', resize);
       clearTimeout(timer);
     };
-  }, [state.aspectRatio]); // CRITICAL: Listen for aspect ratio changes
+  }, [state.aspectRatio]);
 
   useEffect(() => {
     if (backgroundImage) {
@@ -178,14 +175,72 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
     setTextValue('');
   };
 
+  const floodFill = (startX: number, startY: number) => {
+    const canvas = drawCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Helper to get pixel as 32-bit integer
+    const getPixel = (x: number, y: number) => {
+      const i = (y * width + x) * 4;
+      return (data[i] << 24) | (data[i + 1] << 16) | (data[i + 2] << 8) | data[i + 3];
+    };
+
+    // Helper to set pixel using RGBA values
+    const setPixel = (x: number, y: number, r: number, g: number, b: number, a: number) => {
+      const i = (y * width + x) * 4;
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+      data[i + 3] = a;
+    };
+
+    // Parse fill color
+    const hex = state.color.replace('#', '');
+    const fillR = parseInt(hex.substring(0, 2), 16);
+    const fillG = parseInt(hex.substring(2, 4), 16);
+    const fillB = parseInt(hex.substring(4, 6), 16);
+    const fillA = 255;
+    const fillColor = (fillR << 24) | (fillG << 16) | (fillB << 8) | fillA;
+
+    const targetColor = getPixel(startX, startY);
+
+    if (targetColor === fillColor) return;
+
+    const queue: [number, number][] = [[startX, startY]];
+    while (queue.length > 0) {
+      const [x, y] = queue.shift()!;
+      if (x < 0 || x >= width || y < 0 || y >= height) continue;
+      if (getPixel(x, y) !== targetColor) continue;
+
+      setPixel(x, y, fillR, fillG, fillB, fillA);
+      queue.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    saveToHistory();
+  };
+
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    const rect = drawCanvasRef.current!.getBoundingClientRect();
+    const x = Math.round(('touches' in e) ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left);
+    const y = Math.round(('touches' in e) ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top);
+
     if (state.tool === 'text') {
       if (textActive) commitText();
-      const rect = drawCanvasRef.current!.getBoundingClientRect();
-      const x = ('touches' in e) ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
-      const y = ('touches' in e) ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
       setTextActive({ x, y });
       setTimeout(() => textInputRef.current?.focus(), 10);
+      return;
+    }
+
+    if (state.tool === 'fill') {
+      floodFill(x, y);
       return;
     }
 
@@ -193,10 +248,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
     const canvas = drawCanvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (ctx && canvas) {
-      const rect = canvas.getBoundingClientRect();
-      const x = ('touches' in e) ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
-      const y = ('touches' in e) ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
-      
       ctx.beginPath();
       ctx.moveTo(x, y);
       
@@ -218,8 +269,8 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
     const ctx = canvas?.getContext('2d');
     if (ctx && canvas) {
       const rect = canvas.getBoundingClientRect();
-      const x = ('touches' in e) ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
-      const y = ('touches' in e) ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+      const x = ('touches' in e) ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
+      const y = ('touches' in e) ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
       ctx.lineTo(x, y);
       ctx.stroke();
     }
@@ -244,7 +295,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
         onTouchStart={startDrawing}
         onTouchMove={draw}
         onTouchEnd={stopDrawing}
-        className={`absolute inset-0 ${state.tool === 'text' ? 'cursor-text' : 'cursor-crosshair'}`}
+        className={`absolute inset-0 ${state.tool === 'text' ? 'cursor-text' : state.tool === 'fill' ? 'cursor-alias' : 'cursor-crosshair'}`}
       />
       
       {/* Floating Text Input */}
