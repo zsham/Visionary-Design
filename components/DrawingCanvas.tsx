@@ -17,9 +17,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
   const containerRef = useRef<HTMLDivElement>(null);
   const drawCanvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
   
   const [isDrawing, setIsDrawing] = useState(false);
   const [history, setHistory] = useState<ImageData[]>([]);
+  
+  // Text Tool State
+  const [textActive, setTextActive] = useState<{ x: number, y: number } | null>(null);
+  const [textValue, setTextValue] = useState('');
 
   useImperativeHandle(ref, () => ({
     clear: () => {
@@ -34,7 +39,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       const bgCanvas = bgCanvasRef.current;
       if (!drawCanvas || !bgCanvas) return '';
 
-      // Create a temporary canvas to merge both layers for export
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = drawCanvas.width;
       tempCanvas.height = drawCanvas.height;
@@ -99,8 +103,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       const bgCanvas = bgCanvasRef.current;
       if (container && drawCanvas && bgCanvas) {
         const { clientWidth, clientHeight } = container;
-        
-        // Preserve drawing on resize if possible
         const tempDraw = drawCanvas.getContext('2d')?.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
         
         drawCanvas.width = clientWidth;
@@ -117,9 +119,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
         
         if (backgroundImage) {
           drawBackgroundImage(backgroundImage);
-        } else {
-          const ctx = bgCanvas.getContext('2d');
-          if (ctx) ctx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
         }
       }
     };
@@ -127,21 +126,56 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
     resize();
     window.addEventListener('resize', resize);
     return () => window.removeEventListener('resize', resize);
-  }, []); // Initial mount and resize events
+  }, []);
 
   useEffect(() => {
     if (backgroundImage) {
       drawBackgroundImage(backgroundImage);
     } else {
-      const bgCanvas = bgCanvasRef.current;
-      const ctx = bgCanvas?.getContext('2d');
-      if (bgCanvas && ctx) {
-        ctx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
-      }
+      const ctx = bgCanvasRef.current?.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, bgCanvasRef.current!.width, bgCanvasRef.current!.height);
     }
   }, [backgroundImage]);
 
+  const commitText = () => {
+    if (!textActive || !textValue.trim()) {
+      setTextActive(null);
+      setTextValue('');
+      return;
+    }
+
+    const canvas = drawCanvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (ctx && canvas) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = state.color;
+      ctx.font = `${state.isBold ? 'bold ' : ''}${state.fontSize}px ${state.fontFamily}`;
+      ctx.textBaseline = 'top';
+      
+      const lines = textValue.split('\n');
+      lines.forEach((line, i) => {
+        ctx.fillText(line, textActive.x, textActive.y + (i * state.fontSize * 1.2));
+      });
+      
+      ctx.restore();
+      saveToHistory();
+    }
+    setTextActive(null);
+    setTextValue('');
+  };
+
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if (state.tool === 'text') {
+      if (textActive) commitText();
+      const rect = drawCanvasRef.current!.getBoundingClientRect();
+      const x = ('touches' in e) ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+      const y = ('touches' in e) ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+      setTextActive({ x, y });
+      setTimeout(() => textInputRef.current?.focus(), 10);
+      return;
+    }
+
     setIsDrawing(true);
     const canvas = drawCanvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -187,12 +221,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
 
   return (
     <div ref={containerRef} className="w-full h-full bg-white rounded-xl shadow-inner relative overflow-hidden">
-      {/* Background Layer */}
-      <canvas
-        ref={bgCanvasRef}
-        className="absolute inset-0 pointer-events-none"
-      />
-      {/* Drawing Layer */}
+      <canvas ref={bgCanvasRef} className="absolute inset-0 pointer-events-none" />
       <canvas
         ref={drawCanvasRef}
         onMouseDown={startDrawing}
@@ -202,8 +231,34 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
         onTouchStart={startDrawing}
         onTouchMove={draw}
         onTouchEnd={stopDrawing}
-        className="absolute inset-0 cursor-crosshair"
+        className={`absolute inset-0 ${state.tool === 'text' ? 'cursor-text' : 'cursor-crosshair'}`}
       />
+      
+      {/* Floating Text Input */}
+      {textActive && (
+        <div 
+          className="absolute z-40 pointer-events-none"
+          style={{ left: textActive.x, top: textActive.y }}
+        >
+          <textarea
+            ref={textInputRef}
+            value={textValue}
+            onChange={(e) => setTextValue(e.target.value)}
+            onBlur={commitText}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) commitText(); }}
+            className="bg-transparent border-none outline-none p-0 overflow-hidden pointer-events-auto resize-none"
+            style={{
+              color: state.color,
+              fontFamily: state.fontFamily,
+              fontSize: `${state.fontSize}px`,
+              fontWeight: state.isBold ? 'bold' : 'normal',
+              minWidth: '50px',
+              minHeight: `${state.fontSize}px`,
+              lineHeight: '1.2'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 });

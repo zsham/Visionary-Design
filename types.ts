@@ -1,10 +1,13 @@
 
-export type Tool = 'pencil' | 'eraser' | 'circle' | 'rectangle';
+export type Tool = 'pencil' | 'eraser' | 'circle' | 'rectangle' | 'text';
 
 export interface CanvasState {
   color: string;
   brushSize: number;
   tool: Tool;
+  fontSize: number;
+  fontFamily: 'Inter' | 'Georgia' | 'monospace';
+  isBold: boolean;
 }
 
 export interface AIResponse {

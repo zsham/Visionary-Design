@@ -10,7 +10,10 @@ const App: React.FC = () => {
   const [canvasState, setCanvasState] = useState<CanvasState>({
     color: '#0f172a',
     brushSize: 4,
-    tool: 'pencil'
+    tool: 'pencil',
+    fontSize: 24,
+    fontFamily: 'Inter',
+    isBold: false
   });
   
   const [bgImage, setBgImage] = useState<string | null>(null);
@@ -130,12 +133,12 @@ const App: React.FC = () => {
             {/* Status Overlays */}
             <div className="absolute top-4 right-4 flex gap-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                <div className="px-3 py-1.5 bg-slate-900/90 text-white text-[10px] font-bold rounded-full backdrop-blur-md">
-                 {canvasState.brushSize}px • {canvasState.tool.toUpperCase()}
+                 {canvasState.tool === 'text' ? `${canvasState.fontSize}px` : `${canvasState.brushSize}px`} • {canvasState.tool.toUpperCase()}
                </div>
             </div>
 
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md border border-slate-200 px-4 py-1.5 rounded-full text-[10px] font-extrabold text-slate-500 tracking-wider shadow-sm opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-2 group-hover:translate-y-0">
-              WORKSPACE ACTIVE • PRESS SHIFT FOR PRECISION
+              WORKSPACE ACTIVE • {canvasState.tool === 'text' ? 'CLICK TO TYPE' : 'DRAG TO DRAW'}
             </div>
           </div>
         </main>
@@ -154,7 +157,7 @@ const App: React.FC = () => {
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Engine Connected</span>
           </div>
           <div className="h-3 w-px bg-slate-200"></div>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Layer: 01 (Drawing)</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Layer: 01 (Composition)</span>
         </div>
         
         <div className="flex items-center gap-1 group cursor-help">
