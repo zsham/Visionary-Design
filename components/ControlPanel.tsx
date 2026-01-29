@@ -27,6 +27,14 @@ const FillIcon = () => (
   <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M19 11l-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11z"></path><path d="m5 2 5 5"></path><path d="M2 13h15"></path><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4z"></path></svg>
 );
 
+const RectangleIcon = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+);
+
+const CircleIcon = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
+);
+
 const FrameIcon = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
 );
@@ -99,6 +107,30 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
             >
               <FillIcon />
               <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter text-center">Fill</span>
+            </button>
+            <button
+              onClick={() => setState(prev => ({ ...prev, tool: 'rectangle' }))}
+              className={`p-3 rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${
+                state.tool === 'rectangle' 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+              }`}
+              title="Rectangle (R)"
+            >
+              <RectangleIcon />
+              <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter text-center">Rect</span>
+            </button>
+            <button
+              onClick={() => setState(prev => ({ ...prev, tool: 'circle' }))}
+              className={`p-3 rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${
+                state.tool === 'circle' 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+              }`}
+              title="Circle (C)"
+            >
+              <CircleIcon />
+              <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter text-center">Circle</span>
             </button>
             <button
               onClick={() => setState(prev => ({ ...prev, tool: 'text' }))}
@@ -180,7 +212,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
           </section>
         ) : state.tool !== 'fill' ? (
           <section className="hidden md:block">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 px-1">Brush Weight</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 px-1">Stroke Weight</label>
             <div className="px-1 pt-2">
               <input
                 type="range"

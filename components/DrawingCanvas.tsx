@@ -17,10 +17,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
   const containerRef = useRef<HTMLDivElement>(null);
   const drawCanvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
   
   const [isDrawing, setIsDrawing] = useState(false);
   const [history, setHistory] = useState<ImageData[]>([]);
+  const [shapeStart, setShapeStart] = useState<{ x: number, y: number } | null>(null);
   
   // Text Tool State
   const [textActive, setTextActive] = useState<{ x: number, y: number } | null>(null);
@@ -101,7 +103,8 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       const container = containerRef.current;
       const drawCanvas = drawCanvasRef.current;
       const bgCanvas = bgCanvasRef.current;
-      if (container && drawCanvas && bgCanvas) {
+      const previewCanvas = previewCanvasRef.current;
+      if (container && drawCanvas && bgCanvas && previewCanvas) {
         const { clientWidth, clientHeight } = container;
         
         const tempCtx = drawCanvas.getContext('2d');
@@ -114,6 +117,8 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
         drawCanvas.height = clientHeight;
         bgCanvas.width = clientWidth;
         bgCanvas.height = clientHeight;
+        previewCanvas.width = clientWidth;
+        previewCanvas.height = clientHeight;
 
         const drawCtx = drawCanvas.getContext('2d');
         if (drawCtx) {
@@ -186,13 +191,11 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
     const width = canvas.width;
     const height = canvas.height;
 
-    // Helper to get pixel as 32-bit integer
     const getPixel = (x: number, y: number) => {
       const i = (y * width + x) * 4;
       return (data[i] << 24) | (data[i + 1] << 16) | (data[i + 2] << 8) | data[i + 3];
     };
 
-    // Helper to set pixel using RGBA values
     const setPixel = (x: number, y: number, r: number, g: number, b: number, a: number) => {
       const i = (y * width + x) * 4;
       data[i] = r;
@@ -201,7 +204,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       data[i + 3] = a;
     };
 
-    // Parse fill color
     const hex = state.color.replace('#', '');
     const fillR = parseInt(hex.substring(0, 2), 16);
     const fillG = parseInt(hex.substring(2, 4), 16);
@@ -244,6 +246,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       return;
     }
 
+    if (state.tool === 'rectangle' || state.tool === 'circle') {
+      setIsDrawing(true);
+      setShapeStart({ x, y });
+      return;
+    }
+
     setIsDrawing(true);
     const canvas = drawCanvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -265,20 +273,90 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing) return;
+    const rect = drawCanvasRef.current!.getBoundingClientRect();
+    const x = ('touches' in e) ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
+    const y = ('touches' in e) ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
+
+    if (state.tool === 'rectangle' || state.tool === 'circle') {
+      const pCanvas = previewCanvasRef.current;
+      const pCtx = pCanvas?.getContext('2d');
+      if (pCtx && pCanvas && shapeStart) {
+        pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+        pCtx.strokeStyle = state.color;
+        pCtx.lineWidth = state.brushSize;
+        pCtx.lineCap = 'round';
+        pCtx.lineJoin = 'round';
+        pCtx.setLineDash([5, 5]); // Dashed preview
+
+        if (state.tool === 'rectangle') {
+          pCtx.strokeRect(shapeStart.x, shapeStart.y, x - shapeStart.x, y - shapeStart.y);
+        } else if (state.tool === 'circle') {
+          const radiusX = Math.abs(x - shapeStart.x) / 2;
+          const radiusY = Math.abs(y - shapeStart.y) / 2;
+          const centerX = Math.min(x, shapeStart.x) + radiusX;
+          const centerY = Math.min(y, shapeStart.y) + radiusY;
+          pCtx.beginPath();
+          pCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+          pCtx.stroke();
+        }
+      }
+      return;
+    }
+
     const canvas = drawCanvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (ctx && canvas) {
-      const rect = canvas.getBoundingClientRect();
-      const x = ('touches' in e) ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
-      const y = ('touches' in e) ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
       ctx.lineTo(x, y);
       ctx.stroke();
     }
   };
 
-  const stopDrawing = () => {
-    if (isDrawing) {
-      setIsDrawing(false);
+  const stopDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing) return;
+
+    if ((state.tool === 'rectangle' || state.tool === 'circle') && shapeStart) {
+      const rect = drawCanvasRef.current!.getBoundingClientRect();
+      const x = ('touches' in e) ? (e as React.TouchEvent).changedTouches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
+      const y = ('touches' in e) ? (e as React.TouchEvent).changedTouches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
+      
+      const dCanvas = drawCanvasRef.current;
+      const dCtx = dCanvas?.getContext('2d');
+      const pCanvas = previewCanvasRef.current;
+      const pCtx = pCanvas?.getContext('2d');
+
+      if (dCtx && dCanvas) {
+        dCtx.save();
+        dCtx.globalCompositeOperation = 'source-over';
+        dCtx.strokeStyle = state.color;
+        dCtx.lineWidth = state.brushSize;
+        dCtx.lineCap = 'round';
+        dCtx.lineJoin = 'round';
+        dCtx.setLineDash([]); // Solid committed shape
+
+        if (state.tool === 'rectangle') {
+          dCtx.strokeRect(shapeStart.x, shapeStart.y, x - shapeStart.x, y - shapeStart.y);
+        } else if (state.tool === 'circle') {
+          const radiusX = Math.abs(x - shapeStart.x) / 2;
+          const radiusY = Math.abs(y - shapeStart.y) / 2;
+          const centerX = Math.min(x, shapeStart.x) + radiusX;
+          const centerY = Math.min(y, shapeStart.y) + radiusY;
+          dCtx.beginPath();
+          dCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+          dCtx.stroke();
+        }
+        dCtx.restore();
+        saveToHistory();
+      }
+      
+      if (pCtx && pCanvas) {
+        pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+      }
+      
+      setShapeStart(null);
+    }
+
+    setIsDrawing(false);
+    if (state.tool === 'pencil' || state.tool === 'eraser') {
       saveToHistory();
     }
   };
@@ -286,12 +364,13 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
   return (
     <div ref={containerRef} className="w-full h-full bg-white rounded-xl shadow-inner relative overflow-hidden">
       <canvas ref={bgCanvasRef} className="absolute inset-0 pointer-events-none" />
+      <canvas ref={drawCanvasRef} className="absolute inset-0 pointer-events-none" />
       <canvas
-        ref={drawCanvasRef}
+        ref={previewCanvasRef}
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
+        onMouseLeave={(e) => isDrawing && stopDrawing(e)}
         onTouchStart={startDrawing}
         onTouchMove={draw}
         onTouchEnd={stopDrawing}
