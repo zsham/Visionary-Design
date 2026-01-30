@@ -48,12 +48,12 @@ const App: React.FC = () => {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    localStorage.setItem('visionary_session', JSON.stringify(user));
+    localStorage.setItem('visionary_users_session', JSON.stringify(user));
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('visionary_session');
+    localStorage.removeItem('visionary_users_session');
   };
 
   const handleBackgroundGenerated = (url: string) => {
@@ -131,16 +131,19 @@ const App: React.FC = () => {
           onUndo={() => canvasRef.current?.undo()}
           onDownload={handleDownload}
           onReset={handleReset}
+          onUpload={(file) => canvasRef.current?.uploadImage(file)}
+          onCommitImage={() => canvasRef.current?.commitImage()}
+          onCancelImage={() => canvasRef.current?.cancelImage()}
         />
 
         {/* Studio Canvas */}
         <main className="flex-1 p-4 md:p-12 design-grid relative overflow-hidden flex items-center justify-center">
-          {/* CRITICAL: Removed h-full and added max-h-full/max-w-full to allow aspect-ratio to work */}
           <div className={`w-full max-w-full max-h-full ${getAspectClass(canvasState.aspectRatio)} shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] rounded-2xl overflow-hidden bg-white border border-slate-200 relative group transition-all duration-500`}>
             <DrawingCanvas 
               ref={canvasRef} 
               state={canvasState} 
               backgroundImage={bgImage}
+              onImageCommitted={() => setCanvasState(prev => ({ ...prev, tool: 'pencil' }))}
             />
             
             {/* Status Overlays */}
@@ -150,8 +153,10 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md border border-slate-200 px-4 py-1.5 rounded-full text-[10px] font-extrabold text-slate-500 tracking-wider shadow-sm opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-2 group-hover:translate-y-0">
-              WORKSPACE ACTIVE • {canvasState.tool === 'text' ? 'CLICK TO TYPE' : 'DRAG TO DRAW'}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md border border-slate-200 px-4 py-1.5 rounded-full text-[10px] font-extrabold text-slate-500 tracking-wider shadow-sm opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-2 group-hover:translate-y-0 text-center">
+              {canvasState.tool === 'transform' ? 'DRAG TO MOVE • BOTTOM RIGHT TO SCALE' : 
+               canvasState.tool === 'crop' ? 'DRAG TO DEFINE CROP AREA' :
+               canvasState.tool === 'text' ? 'CLICK TO TYPE' : 'DRAG TO DRAW'}
             </div>
           </div>
         </main>

@@ -2,18 +2,31 @@
 import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { Tool, CanvasState } from '../types';
 
+interface EditingImage {
+  img: HTMLImageElement;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+}
+
 interface DrawingCanvasProps {
   state: CanvasState;
   backgroundImage?: string | null;
+  onImageCommitted?: () => void;
 }
 
 export interface DrawingCanvasHandle {
   clear: () => void;
   getImageData: () => string;
   undo: () => void;
+  uploadImage: (file: File) => void;
+  commitImage: () => void;
+  cancelImage: () => void;
 }
 
-const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ state, backgroundImage }, ref) => {
+const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ state, backgroundImage, onImageCommitted }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const drawCanvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -24,6 +37,11 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
   const [history, setHistory] = useState<ImageData[]>([]);
   const [shapeStart, setShapeStart] = useState<{ x: number, y: number } | null>(null);
   
+  // Image Editing State
+  const [editingImage, setEditingImage] = useState<EditingImage | null>(null);
+  const [dragStart, setDragStart] = useState<{ x: number, y: number, imgX: number, imgY: number } | null>(null);
+  const [cropRect, setCropRect] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
+
   // Text Tool State
   const [textActive, setTextActive] = useState<{ x: number, y: number } | null>(null);
   const [textValue, setTextValue] = useState('');
@@ -48,6 +66,9 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       if (tempCtx) {
         tempCtx.drawImage(bgCanvas, 0, 0);
         tempCtx.drawImage(drawCanvas, 0, 0);
+        if (editingImage) {
+           renderEditingImage(tempCtx);
+        }
       }
       return tempCanvas.toDataURL('image/png');
     },
@@ -67,8 +88,89 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
           setHistory([]);
         }
       }
+    },
+    uploadImage: (file: File) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const container = containerRef.current;
+          if (!container) return;
+          const maxWidth = container.clientWidth * 0.8;
+          const maxHeight = container.clientHeight * 0.8;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height *= maxWidth / width;
+            width = maxWidth;
+          }
+          if (height > maxHeight) {
+            width *= maxHeight / height;
+            height = maxHeight;
+          }
+
+          setEditingImage({
+            img,
+            x: (container.clientWidth - width) / 2,
+            y: (container.clientHeight - height) / 2,
+            width,
+            height,
+            rotation: 0
+          });
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    },
+    commitImage: () => {
+      if (!editingImage) return;
+      const canvas = drawCanvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (ctx && canvas) {
+        ctx.save();
+        if (cropRect) {
+           // Apply crop before committing
+           const tempCanvas = document.createElement('canvas');
+           tempCanvas.width = cropRect.w;
+           tempCanvas.height = cropRect.h;
+           const tempCtx = tempCanvas.getContext('2d');
+           if (tempCtx) {
+              tempCtx.drawImage(
+                editingImage.img, 
+                (cropRect.x - editingImage.x) * (editingImage.img.width / editingImage.width), 
+                (cropRect.y - editingImage.y) * (editingImage.img.height / editingImage.height),
+                cropRect.w * (editingImage.img.width / editingImage.width),
+                cropRect.h * (editingImage.img.height / editingImage.height),
+                0, 0, cropRect.w, cropRect.h
+              );
+              ctx.drawImage(tempCanvas, cropRect.x, cropRect.y);
+           }
+        } else {
+          renderEditingImage(ctx);
+        }
+        ctx.restore();
+        saveToHistory();
+        setEditingImage(null);
+        setCropRect(null);
+        if (onImageCommitted) onImageCommitted();
+      }
+    },
+    cancelImage: () => {
+      setEditingImage(null);
+      setCropRect(null);
+      if (onImageCommitted) onImageCommitted();
     }
   }));
+
+  const renderEditingImage = (ctx: CanvasRenderingContext2D) => {
+    if (!editingImage) return;
+    ctx.save();
+    ctx.translate(editingImage.x + editingImage.width / 2, editingImage.y + editingImage.height / 2);
+    ctx.rotate((editingImage.rotation * Math.PI) / 180);
+    ctx.drawImage(editingImage.img, -editingImage.width / 2, -editingImage.height / 2, editingImage.width, editingImage.height);
+    ctx.restore();
+  };
 
   const saveToHistory = () => {
     const ctx = drawCanvasRef.current?.getContext('2d');
@@ -142,6 +244,49 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       clearTimeout(timer);
     };
   }, [state.aspectRatio]);
+
+  // Handle preview rendering for images
+  useEffect(() => {
+    const pCanvas = previewCanvasRef.current;
+    const pCtx = pCanvas?.getContext('2d');
+    if (pCtx && pCanvas) {
+      pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+      if (editingImage) {
+        pCtx.save();
+        // Dim the background if cropping
+        if (state.tool === 'crop') {
+          pCtx.fillStyle = 'rgba(0,0,0,0.4)';
+          pCtx.fillRect(0, 0, pCanvas.width, pCanvas.height);
+        }
+        
+        renderEditingImage(pCtx);
+
+        // Draw crop area
+        if (state.tool === 'crop' && cropRect) {
+           pCtx.clearRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+           pCtx.save();
+           renderEditingImage(pCtx);
+           pCtx.restore();
+           
+           pCtx.strokeStyle = '#6366f1';
+           pCtx.lineWidth = 2;
+           pCtx.strokeRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+        }
+
+        // Draw transformation handles if in transform mode
+        if (state.tool === 'transform' && !isDrawing) {
+          pCtx.strokeStyle = '#6366f1';
+          pCtx.lineWidth = 1;
+          pCtx.strokeRect(editingImage.x - 2, editingImage.y - 2, editingImage.width + 4, editingImage.height + 4);
+          
+          const handleSize = 8;
+          pCtx.fillStyle = '#6366f1';
+          pCtx.fillRect(editingImage.x + editingImage.width - handleSize/2, editingImage.y + editingImage.height - handleSize/2, handleSize, handleSize);
+        }
+        pCtx.restore();
+      }
+    }
+  }, [editingImage, state.tool, cropRect, isDrawing]);
 
   useEffect(() => {
     if (backgroundImage) {
@@ -246,6 +391,25 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
       return;
     }
 
+    if (state.tool === 'transform' && editingImage) {
+      setIsDrawing(true);
+      // Check if clicking resize handle (bottom right)
+      const handleSize = 20;
+      if (Math.abs(x - (editingImage.x + editingImage.width)) < handleSize && Math.abs(y - (editingImage.y + editingImage.height)) < handleSize) {
+        setDragStart({ x, y, imgX: editingImage.width, imgY: editingImage.height });
+      } else {
+        setDragStart({ x, y, imgX: editingImage.x, imgY: editingImage.y });
+      }
+      return;
+    }
+
+    if (state.tool === 'crop' && editingImage) {
+      setIsDrawing(true);
+      setShapeStart({ x, y });
+      setCropRect({ x, y, w: 0, h: 0 });
+      return;
+    }
+
     if (state.tool === 'rectangle' || state.tool === 'circle') {
       setIsDrawing(true);
       setShapeStart({ x, y });
@@ -277,6 +441,37 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
     const x = ('touches' in e) ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
     const y = ('touches' in e) ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
 
+    if (state.tool === 'transform' && editingImage && dragStart) {
+      const dx = x - dragStart.x;
+      const dy = y - dragStart.y;
+      
+      // Check if resizing or moving
+      const handleSize = 20;
+      if (Math.abs(dragStart.x - (editingImage.x + editingImage.width)) < handleSize && Math.abs(dragStart.y - (editingImage.y + editingImage.height)) < handleSize) {
+        setEditingImage(prev => prev ? ({
+          ...prev,
+          width: Math.max(20, dragStart.imgX + dx),
+          height: Math.max(20, dragStart.imgY + dy)
+        }) : null);
+      } else {
+        setEditingImage(prev => prev ? ({
+          ...prev,
+          x: dragStart.imgX + dx,
+          y: dragStart.imgY + dy
+        }) : null);
+      }
+      return;
+    }
+
+    if (state.tool === 'crop' && shapeStart) {
+       const nx = Math.min(x, shapeStart.x);
+       const ny = Math.min(y, shapeStart.y);
+       const nw = Math.abs(x - shapeStart.x);
+       const nh = Math.abs(y - shapeStart.y);
+       setCropRect({ x: nx, y: ny, w: nw, h: nh });
+       return;
+    }
+
     if (state.tool === 'rectangle' || state.tool === 'circle') {
       const pCanvas = previewCanvasRef.current;
       const pCtx = pCanvas?.getContext('2d');
@@ -286,7 +481,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
         pCtx.lineWidth = state.brushSize;
         pCtx.lineCap = 'round';
         pCtx.lineJoin = 'round';
-        pCtx.setLineDash([5, 5]); // Dashed preview
+        pCtx.setLineDash([5, 5]);
 
         if (state.tool === 'rectangle') {
           pCtx.strokeRect(shapeStart.x, shapeStart.y, x - shapeStart.x, y - shapeStart.y);
@@ -314,6 +509,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
   const stopDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing) return;
 
+    if (state.tool === 'transform') {
+       setDragStart(null);
+    }
+
+    if (state.tool === 'crop') {
+       // Just keep cropRect
+    }
+
     if ((state.tool === 'rectangle' || state.tool === 'circle') && shapeStart) {
       const rect = drawCanvasRef.current!.getBoundingClientRect();
       const x = ('touches' in e) ? (e as React.TouchEvent).changedTouches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
@@ -331,7 +534,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
         dCtx.lineWidth = state.brushSize;
         dCtx.lineCap = 'round';
         dCtx.lineJoin = 'round';
-        dCtx.setLineDash([]); // Solid committed shape
+        dCtx.setLineDash([]);
 
         if (state.tool === 'rectangle') {
           dCtx.strokeRect(shapeStart.x, shapeStart.y, x - shapeStart.x, y - shapeStart.y);
@@ -374,7 +577,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(({ sta
         onTouchStart={startDrawing}
         onTouchMove={draw}
         onTouchEnd={stopDrawing}
-        className={`absolute inset-0 ${state.tool === 'text' ? 'cursor-text' : state.tool === 'fill' ? 'cursor-alias' : 'cursor-crosshair'}`}
+        className={`absolute inset-0 ${state.tool === 'text' ? 'cursor-text' : state.tool === 'fill' ? 'cursor-alias' : state.tool === 'transform' ? 'cursor-move' : 'cursor-crosshair'}`}
       />
       
       {/* Floating Text Input */}

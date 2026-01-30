@@ -9,6 +9,9 @@ interface ControlPanelProps {
   onUndo: () => void;
   onDownload: () => void;
   onReset: () => void;
+  onUpload: (file: File) => void;
+  onCommitImage: () => void;
+  onCancelImage: () => void;
 }
 
 const PencilIcon = () => (
@@ -47,8 +50,13 @@ const FrameIcon = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
 );
 
-const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, onUndo, onDownload, onReset }) => {
+const ImageUploadIcon = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+);
+
+const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, onUndo, onDownload, onReset, onUpload, onCommitImage, onCancelImage }) => {
   const colorInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [lastShape, setLastShape] = useState<'rectangle' | 'circle'>('rectangle');
   
   const presets = [
@@ -78,7 +86,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
     setState(prev => ({ ...prev, tool }));
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      onUpload(file);
+      setState(prev => ({ ...prev, tool: 'transform' }));
+    }
+  };
+
   const isShapeActive = state.tool === 'rectangle' || state.tool === 'circle';
+  const isImageEditing = state.tool === 'transform' || state.tool === 'crop';
 
   return (
     <div className="w-16 md:w-64 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden">
@@ -148,31 +165,48 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
               <TextIcon />
               <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter text-center">Type</span>
             </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className={`p-3 rounded-xl flex flex-col items-center justify-center transition-all duration-200 bg-slate-50 text-slate-500 hover:bg-slate-100`}
+              title="Import Image (I)"
+            >
+              <input 
+                ref={fileInputRef}
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                onChange={handleFileUpload}
+              />
+              <ImageUploadIcon />
+              <span className="text-[9px] mt-2 font-bold hidden md:block uppercase tracking-tighter text-center">Import</span>
+            </button>
           </div>
         </section>
 
         {/* Canvas Frame Configuration */}
-        <section className="hidden md:block">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 px-1 flex items-center gap-2">
-            <FrameIcon />
-            Frame Layout
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {aspectRatios.map((ar) => (
-              <button
-                key={ar.value}
-                onClick={() => setState(prev => ({ ...prev, aspectRatio: ar.value }))}
-                className={`py-2 rounded-lg border text-[10px] font-bold transition-all ${
-                  state.aspectRatio === ar.value 
-                  ? 'bg-slate-900 border-slate-900 text-white shadow-md' 
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                {ar.label}
-              </button>
-            ))}
-          </div>
-        </section>
+        {!isImageEditing && (
+          <section className="hidden md:block">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 px-1 flex items-center gap-2">
+              <FrameIcon />
+              Frame Layout
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {aspectRatios.map((ar) => (
+                <button
+                  key={ar.value}
+                  onClick={() => setState(prev => ({ ...prev, aspectRatio: ar.value }))}
+                  className={`py-2 rounded-lg border text-[10px] font-bold transition-all ${
+                    state.aspectRatio === ar.value 
+                    ? 'bg-slate-900 border-slate-900 text-white shadow-md' 
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {ar.label}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Dynamic Context Settings */}
         {state.tool === 'text' ? (
@@ -257,6 +291,44 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ state, setState, onClear, o
                 <span>{state.brushSize}px</span>
               </div>
             </div>
+          </section>
+        ) : isImageEditing ? (
+          <section className="hidden md:block space-y-4 animate-in fade-in slide-in-from-left-2">
+             <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] mb-3 block px-1">Asset Suite</label>
+             <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => setState(prev => ({ ...prev, tool: 'transform' }))}
+                  className={`w-full py-2.5 rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                    state.tool === 'transform' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600'
+                  }`}
+                >
+                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="5 9 2 12 5 15"></polyline><polyline points="9 5 12 2 15 5"></polyline><polyline points="15 19 12 22 9 19"></polyline><polyline points="19 9 22 12 19 15"></polyline><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line></svg>
+                   Transform
+                </button>
+                <button
+                  onClick={() => setState(prev => ({ ...prev, tool: 'crop' }))}
+                  className={`w-full py-2.5 rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                    state.tool === 'crop' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600'
+                  }`}
+                >
+                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 13V3"></path><path d="M11 21H21"></path><path d="M1 6H13"></path><path d="M18 11V21"></path></svg>
+                   Crop Tool
+                </button>
+             </div>
+             <div className="flex gap-2 pt-2">
+                <button
+                  onClick={onCommitImage}
+                  className="flex-1 py-3 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
+                >
+                  Commit
+                </button>
+                <button
+                  onClick={onCancelImage}
+                  className="flex-1 py-3 bg-white border border-slate-200 text-slate-500 text-xs font-bold rounded-xl hover:bg-slate-50 transition-all"
+                >
+                  Cancel
+                </button>
+             </div>
           </section>
         ) : state.tool !== 'fill' ? (
           <section className="hidden md:block">
