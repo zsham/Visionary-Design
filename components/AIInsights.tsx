@@ -84,7 +84,6 @@ const AIInsights: React.FC<AIInsightsProps> = ({ onAnalyze, onBackgroundGenerate
               </div>
 
               <div className="bg-indigo-900 p-5 rounded-2xl shadow-xl shadow-indigo-100">
-                {/* Fix: Corrected typo from </ulabel> to </label> on line 87 */}
                 <label className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest block mb-4">Strategic Steps</label>
                 <ul className="space-y-3">
                   {insight.suggestions.map((s, i) => (
@@ -145,7 +144,7 @@ const AIInsights: React.FC<AIInsightsProps> = ({ onAnalyze, onBackgroundGenerate
             ))}
           </div>
           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-            Studio Engine 3.1.2
+            Visionary Design 1.0
           </p>
         </div>
       </div>
